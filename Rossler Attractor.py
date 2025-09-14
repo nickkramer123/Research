@@ -129,12 +129,12 @@ print(np.shape(x_values)) # list of 3000 values
 
 
 
-os.makedirs("./Research/data", exist_ok=True)  # creates the folders if missing
 # np.savetxt("C:/Users/nflan/OneDrive/Documents/Research/data/x_values.txt", 
 #            x_values, delimiter=",", fmt="%.8f")
 # np.savetxt("C:/Users/nflan/OneDrive/Documents/Research/data/y_values.txt", 
 #            y_values, delimiter=",", fmt="%.8f")
 # np.savetxt("C:/Users/nflan/OneDrive/Documents/Research/data/z_values.txt", 
 #            z_values, delimiter=",", fmt="%.8f")
-with open("C:/Users/nflan/OneDrive/Documents/Research/data/values.pkl", "wb") as file:
+os.makedirs("./Research/data", exist_ok=True)  # creates the folders if missing
+with open("./Research/data/values.pkl", "wb") as file:
     pickle.dump(sol_dict, file)

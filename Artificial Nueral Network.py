@@ -5,35 +5,27 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 import numpy as np
 import pandas as pd
+import pickle
 
 from sklearn.feature_selection import mutual_info_regression
 
 # TODO make the synergy equation
-# TODO get x and f(x) values in here, then test synergy
+# TODO convert seperate values columns into 1 column
 # TODO get X values into this function? maybe make it all one file
 """
 Computes the awnser to our synergy equation (EXPLATIN IN MORE DETAIL)
-param X: list of x values
+param X: 2D array of sample values for x, y, z (3000 sample, 3 variables)
 param f_x: list of x values after being put through neural network
 return final: answer to our equation
 """
 def synergy(X, f_x):
     back = 0
-    front = mutual_info_regression(X, f_x)
-    for i in range(len(X)):
-        x = X[i]
-        back += mutual_info_regression(x, f_x)
-    syn = front - back
-    return syn
-
-
-
-
-
-
-
-
-
+    front = mutual_info_regression(X, f_x.ravel())[0] # finds mutual info for big X
+    for j in range(X.shape[1]): # for each column
+        x = X[:, j].reshape(-1, 1) # reshape the X vector to fit out function
+        back += mutual_info_regression(x, f_x.ravel())[0] # finds sum of mutual info for each individual feature little x
+    final = front - np.sum(back)
+    return final
 
 
 
@@ -51,19 +43,17 @@ device = torch.accelerator.current_accelerator().type if torch.accelerator.is_av
 
 
 
-# import rossler attractor file
-# Read as numpy arrays
-x_values = np.loadtxt("C:/Users/nflan/OneDrive/Documents/Research/data/x_values.txt")
-y_values = np.loadtxt("C:/Users/nflan/OneDrive/Documents/Research/data/y_values.txt")
-z_values = np.loadtxt("C:/Users/nflan/OneDrive/Documents/Research/data/z_values.txt")
 
-# Stack arrays into shape [3000, 3] (3000 samples, 3 features)
+# import rossler attractor file
+# Read as numpy arrays shape [3000, 3] (3000 samples, 3 features)
 # 3000 lists of 3 objects [x1, y1, z1]
-values = np.column_stack((x_values, y_values, z_values))
+with open("./Research/data/values.pkl", "rb") as file:
+    values = pickle.load(file)
+
 
 # Convert to PyTorch tensor
-values = torch.tensor(values, dtype=torch.float32).to(device)
-
+values_array = np.array(list(values.values()), dtype=np.float32)
+values = torch.tensor(values_array).to(device)
 
 # TODO check difference made cus 16
 class NeuralNetwork(nn.Module): # define neuralnetwork class that inherits from nn.Module
