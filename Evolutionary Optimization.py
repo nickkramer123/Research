@@ -1,12 +1,55 @@
 import artificialNeuralNetwork as ANN
 from deap import base, creator, tools
 import random
+from sklearn.feature_selection import mutual_info_regression
+import pickle
+import numpy as np
+import pandas as pd
+import torch
+from torch import nn
 
 
 
 
-class Evolution():
-    neural_network = ANN.NeuralNetwork()
+# Step 1: with X, gather f(x)
+
+# using cpu
+device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+
+
+# import rossler attractor file and convert to pyTorch Tensor
+with open("./Research/data/values.pkl", "rb") as file: # Read as numpy arrays shape [3000, 3] (3000 samples, 3 features)
+    values = pickle.load(file) # 3000 lists of 3 objects [x1, y1, z1]
+values_array = np.array(list(values.values()), dtype=np.float32)
+values = torch.tensor(values_array).to(device)
+
+
+# returns V, or f(x) + e
+# TODO this takes a long time, take a sample?
+class Network():
+    def __init__(self):
+        self.model = ANN.NeuralNetwork().to(device)
+
+    # TODO should values be given? probably
+    def run(self, values):
+        V_values = [] # initialize list to store V, of f(x) + e
+        for i in range(len(values)): # for every little x [x, y, x] value in big X
+            x = values[i].unsqueeze(0)
+            with torch.no_grad():  # no gradients needed
+                y = self.model(x)
+            V_values.append(y.item())
+        return V_values
+
+# gather values to be used in loop
+net = Network()
+V = net.run()
+
+
+
+
+
+
+
 
 # types
 creator.create("FitnessMax", base.Fitness, weights=(1.0,)) # build type for fitness max problem
@@ -23,15 +66,36 @@ toolbox.register("individual", tools.initRepeat, creator.Individual,
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 
-# evaluate function
+# synergy function, used to evaluate
+"""
+Computes the awnser to our synergy equation (EXPLATIN IN MORE DETAIL)
+param X: 2D array of sample values for x, y, z (3000 sample, 3 variables)
+param f_x: list of x values after being put through neural network
+return final: synergy value, fitness value for evolutionary optimization
+"""
+def synergy(X, f_x):
+    back = 0
+    front = mutual_info_regression(X, f_x.ravel())[0] # finds mutual info for big X
+    for j in range(X.shape[1]): # for each column
+        x = X[:, j].reshape(-1, 1) # reshape the X vector to fit out function
+        back += mutual_info_regression(x, f_x.ravel())[0] # finds sum of mutual info for each individual feature little x
+    final = front - np.sum(back)
+    return final
+
+# TODO need to fix
 def evaluate(individual):
-    return sum(individual),
+    return sum(synergy(a, b))
+
+
+
+
+
 
 # operators, or initializers that are already implemented
-toolbox.register("mate", tools.cxTwoPoint)
-toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
-toolbox.register("select", tools.selTournament, tournsize=3)
-toolbox.register("evaluate", evaluate)
+toolbox.register("mate", tools.cxTwoPoint) # crossover, combines the genetic material of two parents to produce offspring
+toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1) # randomly alter part of an individual to introduce new variation
+toolbox.register("select", tools.selTournament, tournsize=3) # Chooses the individuals from the population to survive and reproduce
+toolbox.register("evaluate", evaluate) # assigns a fitness score to an individual
 
 
 
@@ -51,43 +115,43 @@ The final population
 A class:~deap.tools.Logbook with the statistics of the evolution
 '''
 
-'''
-evaluate(population)
-for g in range(ngen):
-    population = select(population, len(population))
-    offspring = varAnd(population, toolbox, cxpb, mutpb)
-    evaluate(offspring)
-    population = offspring
-'''
 # deap eaSimple algorithim
+# TODO return logbook?
 def main():
-    population = toolbox.population(n=50)
+    population = toolbox.population(n=2)
     CXPB, MUTPB, NGEN = 0.5, 0.2, 2
 
     # evaluates the individuals with an invalld fitness
-    invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-    fitnesses = map(toolbox.evaluate, invalid_ind)
-    for ind, fit in zip(invalid_ind, fitnesses):
+    fitnesses = map(toolbox.evaluate, population)
+    for ind, fit in zip(population, fitnesses):
         ind.fitness.values = fit
 
     # enters the generational loop
     for g in range(NGEN):
 
-        # entierly replace the parental population, stochastic and selects the same individual multiple times
-        # do i need more?
-        population = toolbox.select(population, len(population))
+        # select next generation individuals
+        offspring = toolbox.select(population, len(population))
+        # clone the selected individuals (for independence)
+        offspring = list(map(toolbox.clone, offspring))
 
-        # apply the varAnd() function to produce the next generation population
-        offspring = varAnd(population = population, # check
-                           toolbox = toolbox,
-                           cxpb = CXPB,
-                           mutpb = MUTPB)
+        # Apply crossover and mutation on the offspring
+        for child1, child2 in zip(offspring[::2], offspring[1::2]):
+            if random.random() < CXPB:
+                toolbox.mate(child1, child2)
+                del child1.fitness.values
+                del child2.fitness.values
 
-        # evaluates the new individuals and computes the statistics on the population
-        evaluate(offspring)
-        log = Logbook()
-        
+        for mutant in offspring:
+            if random.random() < MUTPB:
+                toolbox.mutate(mutant)
+                del mutant.fitness.values
 
-        population = offspring
+        # Evaluate the individuals with an invalid fitness
+        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+        fitnesses = map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
 
-    return population, Logbook()
+        population[:] = offspring
+
+    return population
