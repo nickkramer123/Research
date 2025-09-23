@@ -9,9 +9,34 @@ import torch
 from torch import nn
 
 
+# Setup for DEAP
+# types
+creator.create("FitnessMax", base.Fitness, weights=(1.0,)) # build type for fitness max problem
+creator.create("Individual", list, fitness=creator.FitnessMax) # create representation of a possible solution
 
 
-# Step 1: with X, gather f(x)
+# toolbox - This creates functions to initialize populations from individuals that are themselves initialized with random float numbers.
+# size = number of parameters in ANN
+IND_SIZE = 249
+
+toolbox = base.Toolbox()
+toolbox.register("attribute", random.random)
+toolbox.register("individual", tools.initRepeat, creator.Individual,
+                 toolbox.attribute, n=IND_SIZE)
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+
+
+# for logbook 
+stats = tools.Statistics(key=lambda ind: ind.fitness.values) # may need [0]
+
+stats.register("avg", np.mean)
+stats.register("max", np.max)
+
+
+
+
+
+
 
 # using cpu
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
@@ -19,18 +44,26 @@ device = torch.accelerator.current_accelerator().type if torch.accelerator.is_av
 
 # import rossler attractor file and convert to pyTorch Tensor
 with open("./Research/data/values.pkl", "rb") as file: # Read as numpy arrays shape [3000, 3] (3000 samples, 3 features)
-    values = pickle.load(file) # 3000 lists of 3 objects [x1, y1, z1]
-values_array = np.array(list(values.values()), dtype=np.float32)
-values = torch.tensor(values_array).to(device)
+    values_pkl = pickle.load(file) # 3000 lists of 3 objects [x1, y1, z1]
 
 
+
+
+# choose one beta (he first one)
+val0 = list(values_pkl.keys())[0]
+# converto to tensor
+values_array = values_pkl[val0].astype(np.float32)  # shape (3000,3)
+values = torch.tensor(values_array, dtype=torch.float32).to(device)
+
+print(values.shape)  # torch.Size([3000,3])
+
+
+# Classes
 # returns V, or f(x) + e
-# TODO this takes a long time, take a sample?
 class Network():
     def __init__(self):
         self.model = ANN.NeuralNetwork().to(device)
 
-    # TODO should values be given? probably
     def run(self, values):
         V_values = [] # initialize list to store V, of f(x) + e
         for i in range(len(values)): # for every little x [x, y, x] value in big X
@@ -40,32 +73,39 @@ class Network():
             V_values.append(y.item())
         return V_values
 
-# gather values to be used in loop
-net = Network()
-V = net.run()
 
 
 
 
+# Functions
+
+# takes weights from genome and gives them to ANN
+def load_weights_from_vector(model, vector):
+    pointer = 0
+    for param in model.parameters(): # for each parameter
+        num = param.numel() # number of elements
+        slice  = vector[pointer:pointer + num]
+        param.data = slice.view_as(param)
+        pointer += num
 
 
 
+# evaluates a synerygy score for an individual
+def evaluate(individual):
+    # check for torch accuracy
+    genome = torch.tensor(individual, dtype=torch.float32, device = device)
 
-# types
-creator.create("FitnessMax", base.Fitness, weights=(1.0,)) # build type for fitness max problem
-creator.create("Individual", list, fitness=creator.FitnessMax) # create representation of a possible solution
+    # load genome into model
+    load_weights_from_vector(net.model, genome)
 
+    # foward pass, runing the model feeding input and getting output
+    with torch.no_grad():
+        f_x = net.model(values).cpu().numpy()
 
-# toolbox - This creates functions to initialize populations from individuals that are themselves initialized with random float numbers.
-IND_SIZE = 10
-
-toolbox = base.Toolbox()
-toolbox.register("attribute", random.random)
-toolbox.register("individual", tools.initRepeat, creator.Individual,
-                 toolbox.attribute, n=IND_SIZE)
-toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-
-
+    # calculate and return synergy
+    score = synergy(values, f_x)
+    return (score, )
+    
 # synergy function, used to evaluate
 """
 Computes the awnser to our synergy equation (EXPLATIN IN MORE DETAIL)
@@ -82,12 +122,13 @@ def synergy(X, f_x):
     final = front - np.sum(back)
     return final
 
-# TODO need to fix
-def evaluate(individual):
-    return sum(synergy(a, b))
 
 
 
+
+# Create ANN and setup logbook
+net = Network()
+logbook = tools.Logbook()
 
 
 
@@ -96,9 +137,6 @@ toolbox.register("mate", tools.cxTwoPoint) # crossover, combines the genetic mat
 toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1) # randomly alter part of an individual to introduce new variation
 toolbox.register("select", tools.selTournament, tournsize=3) # Chooses the individuals from the population to survive and reproduce
 toolbox.register("evaluate", evaluate) # assigns a fitness score to an individual
-
-
-
 '''
 eaSimple from deaps website
 Parameters:
@@ -114,12 +152,12 @@ Returns:
 The final population
 A class:~deap.tools.Logbook with the statistics of the evolution
 '''
-
 # deap eaSimple algorithim
 # TODO return logbook?
 def main():
     population = toolbox.population(n=2)
     CXPB, MUTPB, NGEN = 0.5, 0.2, 2
+    hof = tools.HallOfFame(1) # keeps best individual
 
     # evaluates the individuals with an invalld fitness
     fitnesses = map(toolbox.evaluate, population)
@@ -152,6 +190,26 @@ def main():
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
 
+
         population[:] = offspring
 
-    return population
+        # update hall of fame
+        hof.update(population)
+
+
+        # record for logbook
+        record = stats.compile(population)
+        logbook.record(gen=g, **record)
+
+    return population, logbook, hof
+
+
+
+
+# NOW WE SET UP THE TRAINING LOOP
+
+# initail run
+final_pop, log, hof = main()
+best_ind = hof[0]  # best set of weights
+best_score = best_ind.fitness.values[0]
+print("Best fitness:", best_score)
