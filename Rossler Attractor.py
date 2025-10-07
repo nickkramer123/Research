@@ -7,6 +7,7 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.signal import find_peaks
+from scipy import stats
 
 # parameters
 a = .2
@@ -58,11 +59,24 @@ for i, b in enumerate(b_list):
     sol_dict[b] = sol
 
 
+    # get rid of pre-transient values
+    post_trans_dict = {}
 
-    # extract values
-    x_values = sol_dict[b][:, 0]
-    y_values = sol_dict[b][:, 1]
-    z_values = sol_dict[b][:, 2]
+    for b, arr in sol_dict.items():
+        # slice away first half
+        half = int(0.5 * len(arr))
+        post_trans_arr = arr[half:, :]  # keep rows after half, all columns
+        post_trans_dict[b] = post_trans_arr
+
+
+    # extract values for graphs
+    x_values = post_trans_dict[b][:, 0]
+    y_values = post_trans_dict[b][:, 1]
+    z_values = post_trans_dict[b][:, 2]
+
+
+    
+
 
 
 
@@ -90,7 +104,6 @@ for i, b in enumerate(b_list):
 
 
     # # collect x values
-    # xPostTrans =  x_values[int(.5*len(x_values)):] # getting rid off pre-transient behavior
     # xPeaksInd, _ = find_peaks(xPostTrans) # find local maximum indices
     # xPeaks = xPostTrans[xPeaksInd] # find values correlated to indices
     # x_steady_state.extend(xPeaks) # store values
@@ -135,6 +148,21 @@ print(np.shape(x_values)) # list of 3000 values
 #            y_values, delimiter=",", fmt="%.8f")
 # np.savetxt("C:/Users/nflan/OneDrive/Documents/Research/data/z_values.txt", 
 #            z_values, delimiter=",", fmt="%.8f")
+
+
+
+
+
+# global normalization
+# warning: each beta value has its own standardization
+z_sol_dict = {}
+for key, arr in post_trans_dict.items():
+    if np.std(arr) == 0:
+        z_sol_dict[key] = np.zeros_like(arr) # should never happen
+    else:
+        z_sol_dict[key] = stats.zscore(arr)
+
+
 os.makedirs("./Research/data", exist_ok=True)  # creates the folders if missing
 with open("./Research/data/values.pkl", "wb") as file:
-    pickle.dump(sol_dict, file)
+    pickle.dump(z_sol_dict, file)
