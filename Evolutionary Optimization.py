@@ -25,6 +25,7 @@ creator.create("Individual", list, fitness=creator.FitnessMax) # create represen
 # size = number of parameters in ANN
 IND_SIZE = 249
 
+
 toolbox = base.Toolbox()
 toolbox.register("attribute", random.random)
 toolbox.register("individual", tools.initRepeat, creator.Individual,
@@ -42,9 +43,6 @@ stats.register("max", np.max)
 
 
 
-
-
-
 # using cpu
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
 
@@ -53,6 +51,10 @@ device = torch.accelerator.current_accelerator().type if torch.accelerator.is_av
 with open("./Research/data/values.pkl", "rb") as file: # Read as numpy arrays shape [1500, 3] (1500 samples, 3 features)
     values_pkl = pickle.load(file) # 1500 lists of 3 objects [x1, y1, z1]
 
+
+
+# for plotting v(t)
+vt_values = []
 
 
 
@@ -111,6 +113,10 @@ def evaluate(individual):
 
     # calculate and return synergy
     score = synergy(values, f_x)
+
+    # record one representative f_x value per iteration for plotting
+    vt_values.append(f_x[:, 0])
+
     return (score, )
     
 # synergy function, used to evaluate
@@ -136,7 +142,7 @@ def synergy(X, f_x):
 # Create ANN, setup logbook
 net = Network()
 logbook = tools.Logbook()
-logbook.header = "gen", "avg", "max", "size","spam"
+logbook.header = "gen", "avg", "max", "size", "spam"
 
 
 
@@ -164,8 +170,11 @@ A class:~deap.tools.Logbook with the statistics of the evolution
 # deap eaSimple algorithim
 # TODO return logbook?
 def main():
+    
     population = toolbox.population(n=100)
-    CXPB, MUTPB, NGEN = 0.7, 0.2, 100
+    CXPB, MUTPB, NGEN = 0.7, 0.2, 25
+
+
     hof = tools.HallOfFame(1) # keeps best individual
 
     # evaluates the individuals with an invalld fitness
@@ -248,26 +257,44 @@ print("Best fitness:", best_score)
 
 
 
-# plot (copied from deap notation)
-gen = logbook.select("gen")
-fit_maxs = logbook.select("max")
-fit_avgs = logbook.select("avg")
+# # plot max and avg fitness (copied from deap notation)
+# gen = logbook.select("gen")
+# fit_maxs = logbook.select("max")
+# fit_avgs = logbook.select("avg")
 
-fig, ax1 = plt.subplots()
-line1 = ax1.plot(gen, fit_maxs, "b-", label="Maximum Fitness")
-ax1.set_xlabel("Generation")
-ax1.set_ylabel("Fitness", color="b")
-for tl in ax1.get_yticklabels():
-    tl.set_color("b")
+# fig, ax1 = plt.subplots()
+# line1 = ax1.plot(gen, fit_maxs, "b-", label="Maximum Fitness")
+# ax1.set_xlabel("Generation")
+# ax1.set_ylabel("Fitness", color="b")
+# for tl in ax1.get_yticklabels():
+#     tl.set_color("b")
 
-ax2 = ax1.twinx()
-line2 = ax2.plot(gen, fit_avgs, "r-", label="Average Fitness")
-ax2.set_ylabel("Size", color="r")
-for tl in ax2.get_yticklabels():
-    tl.set_color("r")
+# ax2 = ax1.twinx()
+# line2 = ax2.plot(gen, fit_avgs, "r-", label="Average Fitness")
+# ax2.set_ylabel("Avg", color="r")
+# for tl in ax2.get_yticklabels():
+#     tl.set_color("r")
 
-lns = line1 + line2
-labs = [l.get_label() for l in lns]
-ax1.legend(lns, labs, loc="center right")
+# lns = line1 + line2
+# labs = [l.get_label() for l in lns]
+# ax1.legend(lns, labs, loc="center right")
 
+# plt.show()
+
+
+
+# plot v(t) vs time
+fig, ax = plt.subplots()
+ax.plot(vt_values[-1])
+
+ax.set(xlabel='time', ylabel='v(t) values',
+       title='V(t) vs time')
+ax.grid()
+
+# fig.savefig("test.png")
 plt.show()
+
+
+
+
+# compare v(t) to x(t), y(t), z(t)
