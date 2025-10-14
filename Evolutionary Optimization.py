@@ -255,7 +255,7 @@ print("Best fitness:", best_score)
 
 
 
-
+# PLOTS
 
 # # plot max and avg fitness (copied from deap notation)
 # gen = logbook.select("gen")
@@ -284,12 +284,26 @@ print("Best fitness:", best_score)
 
 
 # plot v(t) vs time
-fig, ax = plt.subplots()
-ax.plot(vt_values[-1])
+# compare v(t) to x(t), y(t), z(t)
+fig, axs = plt.subplots(2, 2)
+axs[0, 0].plot(vt_values[-1])
+axs[0, 0].set_title('v(t)')
 
-ax.set(xlabel='time', ylabel='v(t) values',
-       title='V(t) vs time')
-ax.grid()
+axs[0, 1].plot(values_array[:, 0], 'tab:orange')
+axs[0, 1].set_title('x(t)')
+
+axs[1, 0].plot(values_array[:, 1], 'tab:green')
+axs[1, 0].set_title('y(t)')
+
+axs[1, 1].plot(values_array[:, 2], 'tab:red')
+axs[1, 1].set_title('z(t)')
+
+for ax in axs.flat:
+    ax.set(xlabel='x-label', ylabel='t')
+
+# Hide x labels and tick labels for top plots and y ticks for right plots.
+for ax in axs.flat:
+    ax.label_outer()
 
 # fig.savefig("test.png")
 plt.show()
@@ -297,4 +311,4 @@ plt.show()
 
 
 
-# compare v(t) to x(t), y(t), z(t)
+
