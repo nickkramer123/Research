@@ -56,15 +56,36 @@ with open("./Research/data/values.pkl", "rb") as file: # Read as numpy arrays sh
 # for plotting v(t)
 vt_values = []
 
+print(len(values_pkl))
 
+# choose our 6 beta values (do this in a loop later)
+chaos1_l = list(values_pkl.keys())[100]
+chaos2_l = list(values_pkl.keys())[200]
+bif1_l = list(values_pkl.keys())[350]
+bif2_l = list(values_pkl.keys())[550]
+per1_l = list(values_pkl.keys())[700]
+per2_l= list(values_pkl.keys())[900]
 
-# choose one beta (he first one)
-val0 = list(values_pkl.keys())[0]
-# converto to tensor
-values_array = values_pkl[val0].astype(np.float32)  # shape (1500,3)
-values = torch.tensor(values_array, dtype=torch.float32).to(device)
+# conver all to tensor (also will be looped)
+c1_array = values_pkl[chaos1_l].astype(np.float32)  # shape (1500,3)
+chaos1 = torch.tensor(c1_array, dtype=torch.float32).to(device)
+c2_array = values_pkl[chaos2_l].astype(np.float32)  # shape (1500,3)
+chaos2 = torch.tensor(c2_array, dtype=torch.float32).to(device)
+bif1_array = values_pkl[bif1_l].astype(np.float32)  # shape (1500,3)
+bif1 = torch.tensor(bif1_array, dtype=torch.float32).to(device)
+bif2_array = values_pkl[bif2_l].astype(np.float32)  # shape (1500,3)
+bif2 = torch.tensor(bif2_array, dtype=torch.float32).to(device)
+per1_array = values_pkl[per1_l].astype(np.float32)  # shape (1500,3)
+per1 = torch.tensor(per1_array, dtype=torch.float32).to(device)
+per2_array = values_pkl[per2_l].astype(np.float32)  # shape (1500,3)
+per2 = torch.tensor(per2_array, dtype=torch.float32).to(device)
 
-print(values.shape)  # torch.Size([1500,3])
+values_list = [
+    chaos1, chaos2, bif1, bif2, per1, per2
+]
+
+print(chaos1.shape)  # torch.Size([1500,3])
+
 
 
 # Classes
@@ -99,25 +120,7 @@ def load_weights_from_vector(model, vector):
 
 
 
-# evaluates a synerygy score for an individual
-def evaluate(individual):
-    # check for torch accuracy
-    genome = torch.tensor(individual, dtype=torch.float32, device = device)
 
-    # load genome into model
-    load_weights_from_vector(net.model, genome)
-
-    # foward pass, runing the model feeding input and getting output
-    with torch.no_grad():
-        f_x = net.model(values).cpu().numpy()
-
-    # calculate and return synergy
-    score = synergy(values, f_x)
-
-    # record one representative f_x value per iteration for plotting
-    vt_values.append(f_x[:, 0])
-
-    return (score, )
     
 # synergy function, used to evaluate
 """
@@ -141,8 +144,7 @@ def synergy(X, f_x):
 
 # Create ANN, setup logbook
 net = Network()
-logbook = tools.Logbook()
-logbook.header = "gen", "avg", "max", "size", "spam"
+
 
 
 
@@ -151,7 +153,6 @@ logbook.header = "gen", "avg", "max", "size", "spam"
 toolbox.register("mate", tools.cxTwoPoint) # crossover, combines the genetic material of two parents to produce offspring
 toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1) # randomly alter part of an individual to introduce new variation
 toolbox.register("select", tools.selTournament, tournsize=3) # Chooses the individuals from the population to survive and reproduce
-toolbox.register("evaluate", evaluate) # assigns a fitness score to an individual
 '''
 eaSimple from deaps website
 Parameters:
@@ -169,13 +170,44 @@ A class:~deap.tools.Logbook with the statistics of the evolution
 '''
 # deap eaSimple algorithim
 # TODO return logbook?
-def main():
+def main(values):
     
     population = toolbox.population(n=100)
     CXPB, MUTPB, NGEN = 0.7, 0.2, 100
 
 
     hof = tools.HallOfFame(1) # keeps best individual
+    logbook = tools.Logbook()
+    logbook.header = "gen", "avg", "max", "size", "spam"
+
+    # EVALUATE FUNCTION
+    # evaluates a synerygy score for an individual
+    def evaluate(individual):
+        # check for torch accuracy
+        genome = torch.tensor(individual, dtype=torch.float32, device = device)
+
+        # load genome into model
+        load_weights_from_vector(net.model, genome)
+
+        # foward pass, runing the model feeding input and getting output
+        with torch.no_grad():
+            f_x = net.model(values).cpu().numpy()
+
+        # calculate and return synergy
+        score = synergy(values, f_x)
+
+        # record one representative f_x value per iteration for plotting
+        vt_values.append(f_x[:, 0])
+
+        return (score, )
+
+    toolbox.register("evaluate", evaluate) # assigns a fitness score to an individual
+
+
+
+
+
+
 
     # evaluates the individuals with an invalld fitness
     fitnesses = map(toolbox.evaluate, population)
@@ -233,7 +265,7 @@ def main():
     output = net.model(dummy_input)
 
     dot = make_dot(output, params=dict(net.model.named_parameters()))
-    dot.render("ANN_graph", format="png", view=True)
+    #dot.render("ANN_graph", format="png", view=True)
 
     
     return population, logbook, hof
@@ -243,82 +275,91 @@ def main():
 
 # NOW WE SET UP THE TRAINING LOOP
 
-# initail run
-
-import time
-
-start_time = time.perf_counter()
-final_pop, log, hof = main()
-best_ind = hof[0]  # best set of weights
-best_score = best_ind.fitness.values[0]
-
-end_time = time.perf_counter()
-elapsed_time = end_time - start_time
+hof_fits = []
+best_scores = []
 
 
+gens = []
+maxs = []
+i = 1
+
+# run for all 6 points
+for v in values_list:
+    final = 6
+    print("NOW PRINTING CYCLE ", i, "of ", final)
+    pop, log, hof = main(v)
+    hof_fits.append(hof)
+    i += 1
+
+    # append to lists for plotting
+    
+    gens.append(log.select("gen"))
+    maxs.append(log.select("max"))
+
+j = 1
+# print best set of weights for all 6
+for h in hof_fits:
+    best_ind = h[0]  # best set of weights
+    best_score = best_ind.fitness.values[0]
+    best_scores.append(best_score)
+    print(f"best fitness {j}: {best_score} ")
+    j += 1
 
 
-print("LOGBOOK:")
-print(logbook)
-print("Best fitness:", best_score)
-print("TIME: ", elapsed_time)
+
+
 
 
 
 # PLOTS
 
-# plot max and avg fitness (copied from deap notation)
-gen = logbook.select("gen")
-fit_maxs = logbook.select("max")
-fit_avgs = logbook.select("avg")
+# best fitness plotted against b
+best_scores = [1.72, 2.5, 1.3, .025, .85, .83]
+b_vals = [.2, .4, .7, 1.1, 1.4, 1.8]
+colors = ['red', 'red', 'green', 'green', 'blue', 'blue'] # use colormap for real thung
+fig, ax = plt.subplots()
+p1 = ax.scatter(b_vals[0:2], best_scores[0:2], c = colors[0:2], label='chaotic', alpha = .3)
+p2 = ax.scatter(b_vals[2:4], best_scores[2:4], c = colors[2:4], label='bifurcation', alpha=.3)
+p3 = ax.scatter(b_vals[4:6], best_scores[4:6], c = colors[4:6], label='periodic', alpha = .3)
 
-fig, ax1 = plt.subplots()
-line1 = ax1.plot(gen, fit_maxs, "b-", label="Maximum Fitness")
-ax1.set_xlabel("Generation")
-ax1.set_ylabel("Fitness", color="b")
-for tl in ax1.get_yticklabels():
-    tl.set_color("b")
-
-ax2 = ax1.twinx()
-line2 = ax2.plot(gen, fit_avgs, "r-", label="Average Fitness")
-ax2.set_ylabel("Avg", color="r")
-for tl in ax2.get_yticklabels():
-    tl.set_color("r")
-
-lns = line1 + line2
-labs = [l.get_label() for l in lns]
-ax1.legend(lns, labs, loc="center right")
-
+ax.legend(handles = [p1, p2, p3])
 plt.show()
 
 
+# facets of 6 charts
 
-# plot v(t) vs time
-# # compare v(t) to x(t), y(t), z(t)
-# fig, axs = plt.subplots(2, 2)
-# axs[0, 0].plot(vt_values[-1])
-# axs[0, 0].set_title('v(t)')
+# TODO FIX, RESULTS ARE STACKING
+fig, axs = plt.subplots(3, 2, figsize=(10, 12), sharex=True, sharey=True)
+axs[0, 0].plot(gens[0], maxs[0], "b-", label="Maximum Fitness")
+axs[0, 0].set_title('Chaos 1')
 
-# axs[0, 1].plot(values_array[:, 0], 'tab:orange')
-# axs[0, 1].set_title('x(t)')
+axs[0, 1].plot(gens[1], maxs[1], "b-", label="Maximum Fitness")
+axs[0, 1].set_title('Chaos 2')
 
-# axs[1, 0].plot(values_array[:, 1], 'tab:green')
-# axs[1, 0].set_title('y(t)')
 
-# axs[1, 1].plot(values_array[:, 2], 'tab:red')
-# axs[1, 1].set_title('z(t)')
+axs[1, 0].plot(gens[2], maxs[2], "b-", label="Maximum Fitness")
+axs[1, 0].set_title('Bifurcation 1')
 
-# for ax in axs.flat:
-#     ax.set(xlabel='x-label', ylabel='t')
+axs[1, 1].plot(gens[3], maxs[3], "b-", label="Maximum Fitness")
+axs[1, 1].set_title('Bifurcation 2')
 
-# # Hide x labels and tick labels for top plots and y ticks for right plots.
-# for ax in axs.flat:
-#     ax.label_outer()
+
+axs[2, 0].plot(gens[4], maxs[4], "b-", label="Maximum Fitness")
+axs[2, 0].set_title('Periodic 1')
+
+axs[2, 1].plot(gens[5], maxs[5], "b-", label="Maximum Fitness")
+axs[2, 1].set_title('Periodic 2')
+
+
+
+for ax in axs.flat:
+    ax.set(xlabel='Generation', ylabel='Fitness')
+
+
+
+for ax in axs.flat:
+    ax.label_outer()
 
 # # fig.savefig("test.png")
-# plt.show()
-
-
-
-
+plt.show()
 

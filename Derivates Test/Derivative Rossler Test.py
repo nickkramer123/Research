@@ -1,5 +1,5 @@
 # Rossler Attractor
-
+# TODO Taking a long time, shorten tset?
 import os
 import numpy as np
 import pickle
@@ -12,7 +12,7 @@ from scipy import stats
 # parameters
 a = .2
 # ADJUSTABLE to an extent
-b_list = np.linspace(.1, 2, 1000) # 1000 values between 0 and 2
+b_list = np.linspace(.1, 2, 250) # 250 values between 0 and 2
 g = 5.7
 
 # initial variable values
@@ -20,7 +20,7 @@ g = 5.7
 initVars = [1, 1, 1]
 
 # generate a solution at 3000 evenly spaced samples in the interval 0 <= t <= 250.
-tset = np.linspace(0, 250, 3000) # ADJUSTABLE
+tset = np.linspace(0, 250, 1500) # ADJUSTABLE
 
 # FIRST ORDER OF BUISNESS
 def rossler(initVars, t, alpha, beta, gamma):
@@ -47,27 +47,33 @@ b_vals_z = []
 z_steady_state =[] # long term (post-transient) values of z
 x_steady_state =[] # long term (post-transient) values of x
 
+b_vals_dx = []
+b_vals_dz = []
+dz_steady_state =[]
+dx_steady_state =[] 
+
+
+fsol_dict = {}
 
 for i, b in enumerate(b_list):
     sol = odeint(
-        func = rossler, 
+        func = rossler,
         y0 = initVars,
         t = tset,
         args = (a, b, g),
-        atol=1e-10,  # handle bigger workload
-        rtol=1e-10)
+        atol = 1e-10,
+        rtol = 1e-10
+    )
     sol_dict[b] = sol
 
 
-    # get rid of pre-transient values
+
+
+    # Remove pre-transients
     post_trans_dict = {}
-
     for b, arr in sol_dict.items():
-        # slice away first half
         half = int(0.5 * len(arr))
-        post_trans_arr = arr[half:, :]  # keep rows after half, all columns
-        post_trans_dict[b] = post_trans_arr
-
+        post_trans_dict[b] = arr[half:, :]
 
     # extract values for graphs
     x_values = post_trans_dict[b][:, 0]
@@ -75,17 +81,25 @@ for i, b in enumerate(b_list):
     z_values = post_trans_dict[b][:, 2]
 
 
-    
+    # Compute derivative time series and extract values for graphs
+    derivative_dict = {}
+    for i, (b, arr) in enumerate(post_trans_dict.items()):
+        dxdt_list = [rossler(row, 0, a, b, g) for row in arr]
+        derivative_dict[b] = np.array(dxdt_list)
+
+    # extract values for graphs
+    dx_dt = derivative_dict[b][:, 0]
+    dy_dt = derivative_dict[b][:, 1]
+    dz_dt = derivative_dict[b][:, 2]
 
 
-
-
+    # PLOTS FOR DERIVATIVES
     # 3D Plots
     # For 5 different indexes
     # if i % 50 == 0: 
     #     fig = plt.figure() # create figure
     #     ax = fig.add_subplot(111, projection='3d') # add new axis
-    #     ax.scatter(xs = x_values, ys = y_values, zs = z_values, zdir='z', s=20, c=None, depthshade=True)
+    #     ax.scatter(xs = dx_dt, ys = dy_dt, zs = dz_dt, zdir='z', s=20, c=None, depthshade=True)
     #     ax.set_xlabel("X Axis")
     #     ax.set_ylabel("Y Axis")
     #     ax.set_zlabel("Z Axis")
@@ -95,25 +109,23 @@ for i, b in enumerate(b_list):
 
     # ADJUSTABLE
     # collect z values
-    # zPostTrans =  z_values[int(.5*len(z_values)):] # getting rid off pre-transient behavior
-    zPeaksInd, _ = find_peaks(z_values) # find local maximum indices
-    zPeaks = z_values[zPeaksInd] # find values correlated to indices
-    z_steady_state.extend(zPeaks) # store values
-    b_vals_z.extend([b] * len(zPeaks))# store corresponding b values
-
-
+    dzPeaksInd, _ = find_peaks(dz_dt) # find local maximum indices
+    dzPeaks = dz_dt[dzPeaksInd] # find values correlated to indices
+    dz_steady_state.extend(dzPeaks) # store values
+    b_vals_dz.extend([b] * len(dzPeaks))# store corresponding b values
 
     # collect x values
- #   zPostTrans =  z_values[int(.5*len(z_values)):] # getting rid off pre-transient behavior
-    xPeaksInd, _ = find_peaks(x_values) # find local maximum indices
-    xPeaks = x_values[xPeaksInd] # find values correlated to indices
-    x_steady_state.extend(xPeaks) # store values
-    b_vals_x.extend([b] * len(xPeaks))# store corresponding b values
+    dxPeaksInd, _ = find_peaks(dx_dt) # find local maximum indices
+    dxPeaks = dx_dt[dxPeaksInd] # find values correlated to indices
+    dx_steady_state.extend(dxPeaks) # store values
+    b_vals_dx.extend([b] * len(dxPeaks))# store corresponding b values
+
+
 
 
 
 # # make bifurcation diagram for z
-plt.scatter(x = b_vals_z, y = z_steady_state, s = .3, alpha=.3, color="black")
+plt.scatter(x = b_vals_dz, y = dz_steady_state, s = .3, alpha=.3, color="black")
 plt.xlabel("β (beta)")
 plt.ylabel("z (Steady-State Values)")
 plt.title("Bifurcation Diagram of the Rössler System for z")
@@ -121,28 +133,35 @@ plt.grid(True)
 plt.show()
 
 # # make bifurcation diagram for x
-plt.scatter(x = b_vals_x, y = x_steady_state, s = .3, alpha=.3, color="brown")
+plt.scatter(x = b_vals_dx, y = dx_steady_state, s = .3, alpha=.3, color="brown")
 plt.xlabel("β (beta)")
 plt.ylabel("x (Steady-State Values)")
 plt.title("Bifurcation Diagram of the Rössler System for x")
 plt.grid(True)
 plt.show()
 
-# for nn data collection
-# TODO save data in a file to be used by NN
-print(np.shape(x_values)) # dict for 1500 b values
 
+
+# for nn data collection
+print(np.shape(x_values)) # list of 3000 values
 
 # global normalization
 # warning: each beta value has its own standardization
-z_sol_dict = {}
-for key, arr in post_trans_dict.items():
+dz_sol_dict = {}
+for key, arr in derivative_dict.items():
     if np.std(arr) == 0:
-        z_sol_dict[key] = np.zeros_like(arr) # should never happen
+        dz_sol_dict[key] = np.zeros_like(arr) # should never happen
     else:
-        z_sol_dict[key] = stats.zscore(arr)
+        dz_sol_dict[key] = stats.zscore(arr)
 
 
 os.makedirs("./Research/data", exist_ok=True)  # creates the folders if missing
-with open("./Research/data/values.pkl", "wb") as file:
-    pickle.dump(z_sol_dict, file)
+with open("./Research/data/valuesDeriv.pkl", "wb") as file:
+    pickle.dump(dz_sol_dict, file)
+
+
+
+
+
+
+

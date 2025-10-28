@@ -7,8 +7,12 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
+from torchviz import make_dot
+import matplotlib.pyplot as plt
+from npeet import entropy_estimators as ee
 
-import datetime
+
+
 
 
 # Setup for DEAP
@@ -21,6 +25,7 @@ creator.create("Individual", list, fitness=creator.FitnessMax) # create represen
 # size = number of parameters in ANN
 IND_SIZE = 249
 
+
 toolbox = base.Toolbox()
 toolbox.register("attribute", random.random)
 toolbox.register("individual", tools.initRepeat, creator.Individual,
@@ -31,11 +36,9 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 # for logbook 
 stats = tools.Statistics(key=lambda ind: ind.fitness.values) # may need [0]
 
+
 stats.register("avg", np.mean)
 stats.register("max", np.max)
-
-
-
 
 
 
@@ -45,19 +48,23 @@ device = torch.accelerator.current_accelerator().type if torch.accelerator.is_av
 
 
 # import rossler attractor file and convert to pyTorch Tensor
-with open("./Research/data/values.pkl", "rb") as file: # Read as numpy arrays shape [3000, 3] (3000 samples, 3 features)
-    values_pkl = pickle.load(file) # 3000 lists of 3 objects [x1, y1, z1]
+with open("./Research/data/valuesDeriv.pkl", "rb") as file: # Read as numpy arrays shape [1500, 3] (1500 samples, 3 features)
+    values_pkl = pickle.load(file) # 1500 lists of 3 objects [x1, y1, z1]
 
+
+
+# for plotting v(t)
+vt_values = []
 
 
 
 # choose one beta (he first one)
 val0 = list(values_pkl.keys())[0]
 # converto to tensor
-values_array = values_pkl[val0].astype(np.float32)  # shape (3000,3)
+values_array = values_pkl[val0].astype(np.float32)  # shape (1500,3)
 values = torch.tensor(values_array, dtype=torch.float32).to(device)
 
-print(values.shape)  # torch.Size([3000,3])
+print(values.shape)  # torch.Size([1500,3])
 
 
 # Classes
@@ -106,18 +113,22 @@ def evaluate(individual):
 
     # calculate and return synergy
     score = synergy(values, f_x)
+
+    # record one representative f_x value per iteration for plotting
+    vt_values.append(f_x[:, 0])
+
     return (score, )
     
 # synergy function, used to evaluate
 """
 Computes the awnser to our synergy equation (EXPLATIN IN MORE DETAIL)
-param X: 2D array of sample values for x, y, z (3000 sample, 3 variables)
+param X: 2D array of sample values for x, y, z (1500 sample, 3 variables)
 param f_x: list of x values after being put through neural network
 return final: synergy value, fitness value for evolutionary optimization
 """
 def synergy(X, f_x):
     back = 0
-    front = mutual_info_regression(X, f_x.ravel())[0] # finds mutual info for big X
+    front = ee.mi(X, f_x.ravel()) # finds mutual info for big X
     for j in range(X.shape[1]): # for each column
         x = X[:, j].reshape(-1, 1) # reshape the X vector to fit out function
         back += mutual_info_regression(x, f_x.ravel())[0] # finds sum of mutual info for each individual feature little x
@@ -128,9 +139,11 @@ def synergy(X, f_x):
 
 
 
-# Create ANN and setup logbook
+# Create ANN, setup logbook
 net = Network()
 logbook = tools.Logbook()
+logbook.header = "gen", "avg", "max", "size", "spam"
+
 
 
 
@@ -157,8 +170,11 @@ A class:~deap.tools.Logbook with the statistics of the evolution
 # deap eaSimple algorithim
 # TODO return logbook?
 def main():
-    population = toolbox.population(n=2)
-    CXPB, MUTPB, NGEN = 0.5, 0.2, 2
+    
+    population = toolbox.population(n=100)
+    CXPB, MUTPB, NGEN = 0.7, 0.2, 25
+
+
     hof = tools.HallOfFame(1) # keeps best individual
 
     # evaluates the individuals with an invalld fitness
@@ -195,14 +211,31 @@ def main():
 
         population[:] = offspring
 
+
+        # logging for experiment
         # update hall of fame
         hof.update(population)
-
 
         # record for logbook
         record = stats.compile(population)
         logbook.record(gen=g, **record)
 
+        # to keep track of loading times
+        print(g)
+
+
+
+    # visualize best output before return
+    best_ind = hof[0]
+    load_weights_from_vector(net.model, torch.tensor(best_ind, dtype=torch.float32, device=device))
+
+    dummy_input = torch.randn(1, 3).to(device)
+    output = net.model(dummy_input)
+
+    dot = make_dot(output, params=dict(net.model.named_parameters()))
+    dot.render("ANN_graph", format="png", view=True)
+
+    
     return population, logbook, hof
 
 
@@ -214,16 +247,68 @@ def main():
 final_pop, log, hof = main()
 best_ind = hof[0]  # best set of weights
 best_score = best_ind.fitness.values[0]
+
+
+print("LOGBOOK:")
+print(logbook)
 print("Best fitness:", best_score)
 
 
 
+# PLOTS
 
-# NEW STUFF
+# # plot max and avg fitness (copied from deap notation)
+# gen = logbook.select("gen")
+# fit_maxs = logbook.select("max")
+# fit_avgs = logbook.select("avg")
+
+# fig, ax1 = plt.subplots()
+# line1 = ax1.plot(gen, fit_maxs, "b-", label="Maximum Fitness")
+# ax1.set_xlabel("Generation")
+# ax1.set_ylabel("Fitness", color="b")
+# for tl in ax1.get_yticklabels():
+#     tl.set_color("b")
+
+# ax2 = ax1.twinx()
+# line2 = ax2.plot(gen, fit_avgs, "r-", label="Average Fitness")
+# ax2.set_ylabel("Avg", color="r")
+# for tl in ax2.get_yticklabels():
+#     tl.set_color("r")
+
+# lns = line1 + line2
+# labs = [l.get_label() for l in lns]
+# ax1.legend(lns, labs, loc="center right")
+
+# plt.show()
+
+
+
+# plot v(t) vs time
+# compare v(t) to x(t), y(t), z(t)
+fig, axs = plt.subplots(2, 2)
+axs[0, 0].plot(vt_values[-1])
+axs[0, 0].set_title('v(t)')
+
+axs[0, 1].plot(values_array[:, 0], 'tab:orange')
+axs[0, 1].set_title('x(t)')
+
+axs[1, 0].plot(values_array[:, 1], 'tab:green')
+axs[1, 0].set_title('y(t)')
+
+axs[1, 1].plot(values_array[:, 2], 'tab:red')
+axs[1, 1].set_title('z(t)')
+
+for ax in axs.flat:
+    ax.set(xlabel='x-label', ylabel='t')
+
+# Hide x labels and tick labels for top plots and y ticks for right plots.
+for ax in axs.flat:
+    ax.label_outer()
+
+# fig.savefig("test.png")
+plt.show()
 
 
 
 
-# To view the graph, launch TensorBoard from your terminal:
-# tensorboard --logdir=runs
 
