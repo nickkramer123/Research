@@ -1,4 +1,4 @@
-import artificialNeuralNetwork as ANN
+import ArtificialNeuralNetwork2 as ANN
 from deap import base, creator, tools
 import random
 from sklearn.feature_selection import mutual_info_regression
@@ -48,8 +48,13 @@ device = torch.accelerator.current_accelerator().type if torch.accelerator.is_av
 
 
 # import rossler attractor file and convert to pyTorch Tensor
-with open("./Research/data/values.pkl", "rb") as file: # Read as numpy arrays shape [1500, 3] (1500 samples, 3 features)
+with open("./Research/data/valuesDeriv.pkl", "rb") as file: # Read as numpy arrays shape [1500, 3] (1500 samples, 3 features)
     values_pkl = pickle.load(file) # 1500 lists of 3 objects [x1, y1, z1]
+
+
+
+# for plotting v(t)
+vt_values = []
 
 
 
@@ -85,8 +90,6 @@ values_list = [
 ]
 
 print(chaos1.shape)  # torch.Size([1500,3])
-
-
 
 # Classes
 # returns V, or f(x) + e
@@ -144,7 +147,8 @@ def synergy(X, f_x):
 
 # Create ANN, setup logbook
 net = Network()
-
+logbook = tools.Logbook()
+logbook.header = "gen", "avg", "max", "size", "spam"
 
 
 
@@ -173,14 +177,14 @@ A class:~deap.tools.Logbook with the statistics of the evolution
 def main(values):
     
     population = toolbox.population(n=100)
-    CXPB, MUTPB, NGEN = 0.7, 0.2, 100
+    CXPB, MUTPB, NGEN = 0.7, 0.2, 25
 
 
     hof = tools.HallOfFame(1) # keeps best individual
     logbook = tools.Logbook()
     logbook.header = "gen", "avg", "max", "size", "spam"
 
-    # EVALUATE FUNCTION
+
     # evaluates a synerygy score for an individual
     def evaluate(individual):
         # check for torch accuracy
@@ -202,12 +206,6 @@ def main(values):
         return (score, )
 
     toolbox.register("evaluate", evaluate) # assigns a fitness score to an individual
-
-
-
-
-
-
 
     # evaluates the individuals with an invalld fitness
     fitnesses = map(toolbox.evaluate, population)
@@ -265,13 +263,15 @@ def main(values):
     output = net.model(dummy_input)
 
     dot = make_dot(output, params=dict(net.model.named_parameters()))
-    #dot.render("ANN_graph", format="png", view=True)
+    # dot.render("ANN_graph", format="png", view=True)
 
     
     return population, logbook, hof
 
 
 
+
+# NOW WE SET UP THE TRAINING LOOP
 
 # NOW WE SET UP THE TRAINING LOOP
 
@@ -307,9 +307,54 @@ for h in hof_fits:
 
 
 
+# PLOTS
+
+# best fitness plotted against b
+b_vals = [.2, .4, .7, 1.1, 1.4, 1.8]
+colors = ['red', 'red', 'green', 'green', 'blue', 'blue'] # use colormap for real thung
+fig, ax = plt.subplots()
+p1 = ax.scatter(b_vals[0:2], best_scores[0:2], c = colors[0:2], label='chaotic', alpha = .3)
+p2 = ax.scatter(b_vals[2:4], best_scores[2:4], c = colors[2:4], label='bifurcation', alpha=.3)
+p3 = ax.scatter(b_vals[4:6], best_scores[4:6], c = colors[4:6], label='periodic', alpha = .3)
+
+ax.legend(handles = [p1, p2, p3])
+plt.show()
+
+
+# facets of 6 charts
+
+# TODO FIX, RESULTS ARE STACKING
+fig, axs = plt.subplots(3, 2, figsize=(10, 12), sharex=True, sharey=True)
+axs[0, 0].plot(gens[0], maxs[0], "b-", label="Maximum Fitness")
+axs[0, 0].set_title('Chaos 1')
+
+axs[0, 1].plot(gens[1], maxs[1], "b-", label="Maximum Fitness")
+axs[0, 1].set_title('Chaos 2')
+
+axs[1, 0].plot(gens[2], maxs[2], "b-", label="Maximum Fitness")
+axs[1, 0].set_title('Bifurcation 1')
+
+axs[1, 1].plot(gens[3], maxs[3], "b-", label="Maximum Fitness")
+axs[1, 1].set_title('Bifurcation 2')
+
+
+axs[2, 0].plot(gens[4], maxs[4], "b-", label="Maximum Fitness")
+axs[2, 0].set_title('Periodic 1')
+
+axs[2, 1].plot(gens[5], maxs[5], "b-", label="Maximum Fitness")
+axs[2, 1].set_title('Periodic 2')
 
 
 
+for ax in axs.flat:
+    ax.set(xlabel='Generation', ylabel='Fitness')
 
+
+
+for ax in axs.flat:
+    ax.label_outer()
+
+# # fig.savefig("test.png")
+plt.show()
 
 

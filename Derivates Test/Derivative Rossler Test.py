@@ -12,7 +12,7 @@ from scipy import stats
 # parameters
 a = .2
 # ADJUSTABLE to an extent
-b_list = np.linspace(.1, 2, 250) # 250 values between 0 and 2
+b_list = np.linspace(.1, 2, 1000) # 250 values between 0 and 2
 g = 5.7
 
 # initial variable values
@@ -20,7 +20,7 @@ g = 5.7
 initVars = [1, 1, 1]
 
 # generate a solution at 3000 evenly spaced samples in the interval 0 <= t <= 250.
-tset = np.linspace(0, 250, 1500) # ADJUSTABLE
+tset = np.linspace(0, 250, 3000) # ADJUSTABLE
 
 # FIRST ORDER OF BUISNESS
 def rossler(initVars, t, alpha, beta, gamma):

@@ -1,4 +1,4 @@
-import artificialNeuralNetwork as ANN
+import ArtificialNeuralNetwork2 as ANN
 from deap import base, creator, tools
 import random
 from sklearn.feature_selection import mutual_info_regression

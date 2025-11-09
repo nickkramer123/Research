@@ -50,41 +50,8 @@ device = torch.accelerator.current_accelerator().type if torch.accelerator.is_av
 # import rossler attractor file and convert to pyTorch Tensor
 with open("./Research/data/values.pkl", "rb") as file: # Read as numpy arrays shape [1500, 3] (1500 samples, 3 features)
     values_pkl = pickle.load(file) # 1500 lists of 3 objects [x1, y1, z1]
+    
 
-
-
-# for plotting v(t)
-vt_values = []
-
-print(len(values_pkl))
-
-# choose our 6 beta values (do this in a loop later)
-chaos1_l = list(values_pkl.keys())[100]
-chaos2_l = list(values_pkl.keys())[200]
-bif1_l = list(values_pkl.keys())[350]
-bif2_l = list(values_pkl.keys())[550]
-per1_l = list(values_pkl.keys())[700]
-per2_l= list(values_pkl.keys())[900]
-
-# conver all to tensor (also will be looped)
-c1_array = values_pkl[chaos1_l].astype(np.float32)  # shape (1500,3)
-chaos1 = torch.tensor(c1_array, dtype=torch.float32).to(device)
-c2_array = values_pkl[chaos2_l].astype(np.float32)  # shape (1500,3)
-chaos2 = torch.tensor(c2_array, dtype=torch.float32).to(device)
-bif1_array = values_pkl[bif1_l].astype(np.float32)  # shape (1500,3)
-bif1 = torch.tensor(bif1_array, dtype=torch.float32).to(device)
-bif2_array = values_pkl[bif2_l].astype(np.float32)  # shape (1500,3)
-bif2 = torch.tensor(bif2_array, dtype=torch.float32).to(device)
-per1_array = values_pkl[per1_l].astype(np.float32)  # shape (1500,3)
-per1 = torch.tensor(per1_array, dtype=torch.float32).to(device)
-per2_array = values_pkl[per2_l].astype(np.float32)  # shape (1500,3)
-per2 = torch.tensor(per2_array, dtype=torch.float32).to(device)
-
-values_list = [
-    chaos1, chaos2, bif1, bif2, per1, per2
-]
-
-print(chaos1.shape)  # torch.Size([1500,3])
 
 
 
@@ -197,7 +164,7 @@ def main(values):
         score = synergy(values, f_x)
 
         # record one representative f_x value per iteration for plotting
-        vt_values.append(f_x[:, 0])
+        # vt_values.append(f_x[:, 0])
 
         return (score, )
 
@@ -277,38 +244,56 @@ def main(values):
 
 hof_fits = []
 best_scores = []
+logbooks = []
 
 
 gens = []
 maxs = []
-i = 1
 
 # run for all 6 points
-for v in values_list:
-    final = 6
-    print("NOW PRINTING CYCLE ", i, "of ", final)
-    pop, log, hof = main(v)
+for i, (b_key, arr) in enumerate(values_pkl.items()):
+
+    b_val = float(b_key)  # 🔧 convert numpy float -> python float
+    values_array = arr.astype(np.float32)
+    values = torch.tensor(values_array, dtype=torch.float32).to(device)
+
+
+
+
+    print("NOW PRINTING CYCLE ", i, "b = ", b_val)
+    pop, log, hof = main(values)
     hof_fits.append(hof)
-    i += 1
-
-    # append to lists for plotting
-    
-    gens.append(log.select("gen"))
-    maxs.append(log.select("max"))
-
-j = 1
-# print best set of weights for all 6
-for h in hof_fits:
-    best_ind = h[0]  # best set of weights
-    best_score = best_ind.fitness.values[0]
-    best_scores.append(best_score)
-    print(f"best fitness {j}: {best_score} ")
-    j += 1
+    logbooks.append(log)
+    best_scores.append(hof[0].fitness.values[0])
 
 
 
 
 
+# PLOTS
+# TODO FIX
+# best fitness plotted against b
+b = 0
+fig, ax = plt.subplots()
+for i, s in enumerate(best_scores):
+
+    # choose color and label
+    color = 'red' 
+    labels = 'chaotic'   
+    if i > 25:
+        color = 'green'
+        labels = 'bifurcation'
+    if color > 55:
+        color = 'blue'
+        labels = 'periodic'
+
+    p1 = ax.scatter(b, s, c = color, alpha = .3)
+    b += .002
+
+ax.set_xlabel('b value')
+ax.set_ylabel('best fitness')
+
+plt.show()
 
 
 
