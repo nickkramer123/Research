@@ -1,4 +1,4 @@
-import artificialNeuralNetwork as ANN
+import Artificial_Nueral_Network as ANN
 from deap import base, creator, tools
 import random
 from sklearn.feature_selection import mutual_info_regression
@@ -268,6 +268,13 @@ for i, (b_key, arr) in enumerate(values_pkl.items()):
 
 
 
+# write out best fitnesses to text file just in case
+with open('best_scores.txt', 'w') as file:
+    for score in best_scores:
+        row_string = ' '.join(map(str, score))
+        file.write(row_string + '\n')
+
+
 
 
 # PLOTS
@@ -294,7 +301,7 @@ ax.set_xlabel('b value')
 ax.set_ylabel('best fitness')
 
 plt.show()
-
+plt.savefig("allB.png")
 
 
 
