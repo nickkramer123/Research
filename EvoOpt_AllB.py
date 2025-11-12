@@ -1,4 +1,4 @@
-import Artificial_Nueral_Network as ANN
+import artificialNeuralNetwork as ANN
 from deap import base, creator, tools
 import random
 from sklearn.feature_selection import mutual_info_regression
@@ -48,7 +48,7 @@ device = torch.accelerator.current_accelerator().type if torch.accelerator.is_av
 
 
 # import rossler attractor file and convert to pyTorch Tensor
-with open("./Research/data/values.pkl", "rb") as file: # Read as numpy arrays shape [1500, 3] (1500 samples, 3 features)
+with open("./data/values.pkl", "rb") as file: # Read as numpy arrays shape [1500, 3] (1500 samples, 3 features)
     values_pkl = pickle.load(file) # 1500 lists of 3 objects [x1, y1, z1]
     
 

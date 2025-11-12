@@ -1,0 +1,7 @@
+iCMD: python EvoOpt_AllB.py 0
+iDir: /gpfs1/home/n/c/nckramer/Project
+iCMD: python EvoOpt_AllB.py 1
+iDir: /gpfs1/home/n/c/nckramer/Project
+mkdir: cannot create directory ‘submits/’: File exists
+Submitted batch job 1850770
+Submitted batch job 1850771

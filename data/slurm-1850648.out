@@ -1,0 +1,2 @@
+/var/spool/slurm/d/job1850648/slurm_script: line 9: activate: No such file or directory
+python: can't open file '/gpfs1/home/n/c/nckramer/Project/script.py': [Errno 2] No such file or directory
