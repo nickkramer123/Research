@@ -82,16 +82,16 @@ for i, b in enumerate(b_list):
 
     # 3D Plots
     # For 5 different indexes
-    # if i % 50 == 0: 
-    #     fig = plt.figure() # create figure
-    #     ax = fig.add_subplot(111, projection='3d') # add new axis
-    #     ax.scatter(xs = x_values, ys = y_values, zs = z_values, zdir='z', s=20, c=None, depthshade=True)
-    #     ax.set_xlabel("X Axis")
-    #     ax.set_ylabel("Y Axis")
-    #     ax.set_zlabel("Z Axis")
-    #     ax.set_title('Attractor at β = ' + f'{b:.3f}' + ':')
+    if i % 50 == 0: 
+        fig = plt.figure() # create figure
+        ax = fig.add_subplot(111, projection='3d') # add new axis
+        ax.scatter(xs = x_values, ys = y_values, zs = z_values, zdir='z', s=20, c=None, depthshade=True)
+        ax.set_xlabel("X Axis")
+        ax.set_ylabel("Y Axis")
+        ax.set_zlabel("Z Axis")
+        ax.set_title('Attractor at β = ' + f'{b:.3f}' + ':')
 
-    #     plt.show()
+        plt.show()
 
     # ADJUSTABLE
     # collect z values
