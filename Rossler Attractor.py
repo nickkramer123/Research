@@ -82,7 +82,7 @@ for i, b in enumerate(b_list):
 
     # 3D Plots
     # For 5 different indexes
-    if i % 50 == 0: 
+    if i % 225 == 0: 
         fig = plt.figure() # create figure
         ax = fig.add_subplot(111, projection='3d') # add new axis
         ax.scatter(xs = x_values, ys = y_values, zs = z_values, zdir='z', s=20, c=None, depthshade=True)

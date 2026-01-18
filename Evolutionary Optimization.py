@@ -268,28 +268,28 @@ print("TIME: ", elapsed_time)
 # PLOTS
 
 # plot max and avg fitness (copied from deap notation)
-gen = logbook.select("gen")
-fit_maxs = logbook.select("max")
-fit_avgs = logbook.select("avg")
+# gen = logbook.select("gen")
+# fit_maxs = logbook.select("max")
+# fit_avgs = logbook.select("avg")
 
-fig, ax1 = plt.subplots()
-line1 = ax1.plot(gen, fit_maxs, "b-", label="Maximum Fitness")
-ax1.set_xlabel("Generation")
-ax1.set_ylabel("Fitness", color="b")
-for tl in ax1.get_yticklabels():
-    tl.set_color("b")
+# fig, ax1 = plt.subplots()
+# line1 = ax1.plot(gen, fit_maxs, "b-", label="Maximum Fitness")
+# ax1.set_xlabel("Generation")
+# ax1.set_ylabel("Fitness", color="b")
+# for tl in ax1.get_yticklabels():
+#     tl.set_color("b")
 
-ax2 = ax1.twinx()
-line2 = ax2.plot(gen, fit_avgs, "r-", label="Average Fitness")
-ax2.set_ylabel("Avg", color="r")
-for tl in ax2.get_yticklabels():
-    tl.set_color("r")
+# ax2 = ax1.twinx()
+# line2 = ax2.plot(gen, fit_avgs, "r-", label="Average Fitness")
+# ax2.set_ylabel("Avg", color="r")
+# for tl in ax2.get_yticklabels():
+#     tl.set_color("r")
 
-lns = line1 + line2
-labs = [l.get_label() for l in lns]
-ax1.legend(lns, labs, loc="center right")
+# lns = line1 + line2
+# labs = [l.get_label() for l in lns]
+# ax1.legend(lns, labs, loc="center right")
 
-plt.show()
+# plt.show()
 
 
 

@@ -271,8 +271,7 @@ for i, (b_key, arr) in enumerate(values_pkl.items()):
 # write out best fitnesses to text file just in case
 with open('best_scores.txt', 'w') as file:
     for score in best_scores:
-        row_string = ' '.join(map(str, score))
-        file.write(row_string + '\n')
+        file.write(str(score) + '\n')  # Just convert the single float to string
 
 
 
